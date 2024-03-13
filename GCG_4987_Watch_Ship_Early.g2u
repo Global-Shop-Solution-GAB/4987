@@ -1,0 +1,179 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'BN, Arp 30, 2018
+'Project description is at the bottom
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+
+F.ODBC.Connection!conx.OpenCompanyConnection(600)
+
+F.Intrinsic.Control.SelectCase(v.Caller.Hook)
+	'Populate hook: Screen OES0FSN: Order Entry > Transactions > Shipments > Open/New then Select Order# 
+	f.Intrinsic.Control.Case(28510)
+		f.Intrinsic.Control.CallSub("Check_Early_Ship")
+		
+	'Populate hook: Order Header Screen: Order Entry > File > Sales Orders > Open/New
+	f.Intrinsic.Control.Case(11560)
+		f.Intrinsic.Control.CallSub("Name_and_Show_Hidden_Controls")		
+		
+	'Sales Order number browser hook: Order Header Screen: Order Entry > File > Sales Orders > Open/New
+	F.Intrinsic.Control.Case(11565)
+		f.Intrinsic.Control.CallSub("Get_Not_Ship_Early_List")
+		
+	'Post Save button or Line button hook: Order Header Screen: Order Entry > File > Sales Orders > Open/New
+	F.Intrinsic.Control.CaseAny(11872,11810)
+		f.Intrinsic.Control.CallSub("Save_Not_Ship_Early_List")
+		
+F.Intrinsic.Control.EndSelect
+
+f.ODBC.Connection!conx.Close
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.Name_and_Show_Hidden_Controls.Start
+f.Intrinsic.Control.Try
+v.Local.sError.Declare
+
+'PL for horizontal position and PT for 'Set vertical position
+		
+'Add Label
+V.Passed.GAB-LBL-1.Set("Do not ship early")
+f.Intrinsic.UI.ChangeCallerProperty(v.Passed.GAB-LBL-1,"HIDE",0)
+F.Intrinsic.UI.ChangeCallerProperty(V.Passed.GAB-LBL-1,"LOCK",0)
+f.Intrinsic.Variable.SetProperty("GAB-LBL-1","PL",700)
+F.Intrinsic.Variable.SetProperty("GAB-LBL-1","PT",524)
+
+'Add checkbox
+f.Intrinsic.UI.ChangeCallerProperty(v.Passed.GAB-CHK-1,"HIDE",0)
+F.Intrinsic.UI.ChangeCallerProperty(V.Passed.GAB-CHK-1,"LOCK",0)
+f.Intrinsic.Variable.SetProperty("GAB-CHK-1","PL",700)		
+F.Intrinsic.Variable.SetProperty("GAB-CHK-1","PT",542)
+V.Passed.GAB-CHK-1.Set("N")
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Name_and_Show_Hidden_Controls.End
+
+Program.Sub.Get_Not_Ship_Early_List.Start
+f.Intrinsic.Control.Try
+v.Local..BulkDeclareString(sError,sOrder,sSQL,sRet)
+
+f.Intrinsic.String.LPad(Variable.Passed.000003,"0",7,v.local.sOrder)
+f.Intrinsic.String.Build("Select Order_NO from GCG_4987_NoShipEarly Where Order_No = '{0}'",v.Local.sOrder,v.Local.sSQL)
+
+f.ODBC.Connection!conx.ExecuteAndReturn(v.Local.sSQL,v.Local.sRet)
+f.Intrinsic.Control.If(v.Local.sRet,<>,"")
+	v.Passed.GAB-CHK-1.Set("Y")
+f.Intrinsic.Control.Else
+	v.Passed.GAB-CHK-1.Set("N")
+f.Intrinsic.Control.EndIf		
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Get_Not_Ship_Early_List.End
+
+Program.Sub.Save_Not_Ship_Early_List.Start
+f.Intrinsic.Control.Try
+v.Local..BulkDeclareString(sError,sOrder,sSQL,sRet)
+
+f.Intrinsic.String.LPad(Variable.Passed.000003,"0",7,v.local.sOrder)
+f.Intrinsic.Control.If(v.Passed.GAB-CHK-1,=,"N")
+	f.Intrinsic.String.Build("Delete from GCG_4987_NOShipEarly where Order_No = '{0}'",v.Local.sOrder,v.Local.sSQL)
+	f.ODBC.Connection!conx.Execute(v.Local.sSQL)
+f.Intrinsic.Control.Else
+	f.Intrinsic.String.Build("Select * from GCG_4987_NoShipEarly Where Order_No = '{0}'",v.Local.sOrder,v.Local.sSQL)
+	f.ODBC.Connection!conx.ExecuteAndReturn(v.Local.sSQL,v.Local.sRet)
+	f.Intrinsic.Control.If(v.Local.sRet,=,"")
+		f.Intrinsic.String.Build("Insert into GCG_4987_NoShipEarly (Order_No)values ('{0}')",v.Local.sOrder,v.Local.sSQL)	
+		f.ODBC.Connection!conx.Execute(v.Local.sSQL)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf	
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Save_Not_Ship_Early_List.End
+
+Program.Sub.Check_Early_Ship.Start
+f.Intrinsic.Control.Try
+v.Local..BulkDeclareString(sError,sSQL,sRet,sHold,sReadRow,sOrdList)
+v.Local..BulkDeclareLong(iFlag,iC,iRow)
+v.Local.dPromDate.Declare
+
+f.Data.DataTable.Create("D",True)
+f.Data.DataTable.AddColumn("D","Ord","String")
+
+f.Intrinsic.BDF.Load("AUX001","AUX001")
+F.Intrinsic.BDF.ReadRowCount("AUX001",V.Local.iRow)
+F.Intrinsic.Math.Sub(V.Local.iRow,1,V.Local.iRow)
+F.Intrinsic.Control.For(V.Local.iC,0,V.Local.iRow,1)
+	'Read row
+	F.Intrinsic.BDF.ReadRow("AUX001",V.Local.iC,V.Local.sReadRow)
+	F.Intrinsic.String.Split(V.Local.sReadRow,"|~|",V.Local.sReadRow)
+	'Index 0: Order_No, Index 13: Item Promise Date YYYYMMDD
+	f.Intrinsic.Control.If(v.Local.sReadRow.UBound,>,12)
+		f.Intrinsic.Control.If(v.Local.sReadRow(13),<>,"")
+			f.Intrinsic.String.Mid(v.Local.sReadRow(13),5,2,v.Local.sHold)
+			F.Intrinsic.Date.DateSerial(v.Local.sReadRow(13).Left4,v.Local.sHold,v.Local.sReadRow(13).Right2,v.Local.dPromDate)	
+			f.Intrinsic.Control.If(v.Local.dPromDate,>,v.Ambient.Date)
+				f.Intrinsic.String.LPad(v.Local.sReadRow(0),"0",7,v.Local.sHold)
+				f.Data.DataTable.AddRow("D","Ord",v.Local.sHold)
+			f.Intrinsic.Control.EndIf
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iC)
+
+'Check Item Promise Date, if after than today, show message box asking to proceed or not. If user selects to not proceed, the Save button will be blocked
+f.Intrinsic.Control.If(v.DataTable.D.RowCount,>,0)
+	f.Data.DataView.Create("D","DV",22,"","")
+	F.Data.DataView.ToDataTableDistinct("D","DV","DDistinct","Ord",True)
+	f.Data.DataView.Create("DDistinct","DVDistinct",22,"","")
+	f.Data.DataView.ToString("DDistinct","DVDistinct","Ord","","','",v.Local.sOrdList)
+	f.Intrinsic.String.Build("'{0}'",v.Local.sOrdList,v.Local.sOrdList)
+	f.Intrinsic.String.Build("select Order_No from GCG_4987_NoShipEarly Where Order_No in ({0})",v.Local.sOrdList,v.Local.sSQL)
+	f.ODBC.Connection!conx.ExecuteAndReturn(v.Local.sSQL,v.Local.sRet)
+	f.Intrinsic.Control.If(v.Local.sRet,<>,"")
+		f.Intrinsic.String.Replace(v.Local.sRet,"#$#",", ",v.Local.sRet)
+		f.Intrinsic.String.Build("These orders: {0} are flagged not to ship early - Are you sure you want to ship this item?",v.Local.sRet,v.Local.sHold)
+		F.Intrinsic.UI.Msgbox(v.Local.sHold,"Early Ship Watch",4,v.Local.iFlag)
+		'Say No
+		F.Intrinsic.Control.If(V.Local.iFlag,=,7)
+			F.Intrinsic.UI.ChangeCallerProperty(V.Passed.000002,"LOCK",1)			
+			f.Intrinsic.UI.Msgbox("Please close this screen, you are not able to proceed","Close Shipments New")
+		F.Intrinsic.Control.EndIf		
+	F.Intrinsic.Control.EndIf
+f.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+Program.Sub.Check_Early_Ship.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$BAO30-1$}$$}$12:00:00 AM$}$
+'BN, Arp , 2018
+This program will add a checkbox to the order header for "Do Not Ship Early".
+Upon clicking Save button of the order header/or clicking the Line button, the program will save the order number in a custom table GCG_4987_NoShipEarly.
+
+Before populating the Shipment New screen (screen OES0FSN) a check will be done to see if the order has at least 1 line that has the promised date later than today and is in the list GCG_4987_NoShipEarly.
+If there is, a message box will pop up letting user to decide whether to proceed.
+Program.Sub.Comments.End
+
